@@ -1,0 +1,55 @@
+#  1. Seleccionamos variables -> hacer tabulado (de una variable, de dos variables, de tres variables)
+
+#### declaramos diseño complejo ####
+enusc2021 <- enusc2021[enusc2021$Kish == 1,]
+
+dcPERS = svydesign(ids =~Conglomerado, strata = ~VarStrat, weights = ~Fact_Pers ,data = enusc2021)
+dcHOG = svydesign(ids =~Conglomerado, strata = ~VarStrat, weights = ~Fact_Hog ,data = enusc2021)
+options(survey.lonely.psu = "certainty")
+
+# tabulado1 = left_join(evaluate_prop(create_prop(var = variable,
+#                                                 disenio = dcPERS, dominios = "enc_regionFIX", subpop = subpopOBJ,
+#                                                 standard_eval = T), 
+#                                     publicar = T)  %>% select(1,objetivo,calidad) %>% 
+#                         mutate(calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2"))) %>% 
+#                         rename("Región" = 1, "Total" = 2, "NotaTOT" = 3),  
+#                       
+#                       evaluate_prop(create_prop(var = variable, disenio = dcPERS, dominios = "enc_regionFIX+rph_sexo",subpop = subpopOBJ,
+#                                                 standard_eval = T), 
+#                                     publicar = T)  %>% select(1,2,objetivo,calidad) %>% mutate(rph_sexo = ifelse(rph_sexo == 1, "Hombres","Mujeres"),
+#                                                                                                calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2"))) %>% 
+#                         pivot_wider( names_from = rph_sexo, values_from = c(objetivo, calidad)) %>% select(1,2,4,3,5) %>% 
+#                         rename("Región" = 1,"Hombres" = 2,"Mujeres" = 4,"Nota1" = 3,"Nota2" = 5), by = "Región")
+
+create_tab <- function(variable_obj, sub_dim_var == NULL, crossing_var, disenio){
+  
+  #### para lazy eval 
+    var <- rlang::enexpr(variable_obj)
+    var <- rlang::expr_name(var)
+    
+    dominios <- rlang::enexpr(crossing_var)
+    dominios <- rlang::expr_name(dominios)
+    
+    sub_dim_var <- rlang::enexpr(sub_dim_var)
+    
+    if(!is.null(sub_dim_var)){
+      sub_dim_var <- rlang::expr_name(sub_dim_var)
+      dominios=paste0(dominios,"+",sub_dim_var) 
+    }
+    
+#    create_prop(var, disenio, dominios, standard_eval = T)
+}
+
+
+
+
+
+#  2. Definimos categorias de interés -> 
+
+
+
+
+
+
+
+

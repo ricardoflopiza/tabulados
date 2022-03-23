@@ -1,0 +1,587 @@
+library(tidyverse)
+library(haven)
+library(survey)
+library(calidad)
+library(openxlsx)
+
+# multipetal(iris, 30)
+# 
+# multipetal <- function(df, n) {
+#   mutate(df, "petal.{n}" := Petal.Width * n)
+# }
+# 
+
+
+#enusc_prueba = readRDS("/home/ricardo/Documents/INE/servicios_compartidos/shiny_calidad/bkish_2019_mas_variables.rds")
+enusc2021 = read_sav("base-usuario-18-enusc-2021-sav.sav")
+
+#enusc2021$G2_1_1 = dplyr::if_else(enusc2021$G2_1_1==1,1,0) 
+#enusc2021$G1_1_1 = dplyr::if_else(enusc2021$G2_1_1==1,1,0) 
+#
+### filtramos por kish ####
+#enusc2021 = enusc2021[enusc2021$Kish == 1,]
+#
+#dcHOG = svydesign(ids =~Conglomerado, strata = ~VarStrat, weights = ~Fact_Hog ,data = enusc2021)
+#options(survey.lonely.psu = "certainty")
+#
+#create_prop(G2_1_1, disenio = dcHOG, subpop = G1_1_1)
+
+plan2020 = read.xlsx("plan_tabulado2020.xlsx")
+#plan2019 = read.xlsx("plan_tabulado.xlsx")
+llave = read.xlsx("nombres_estandar_enusc.xlsx")  
+
+plan2020$Cuadro = stringr::str_remove(tolower(plan2020$Cuadro),".$")
+#plan2019$Cuadro = stringr::str_remove(tolower(plan2019$Cuadro),".$")
+plan2020$Nombre.variable = stringr::str_remove(plan2020$Nombre.variable,".$")
+
+plan2020 = plan2020 %>% left_join(llave[,c("Nombre.FULL.2021.Reducida","Nombre.FULL.2019")],by = c("Nombre.variable" =  "Nombre.FULL.2021.Reducida")) %>% 
+  left_join(plan2019[,c(5:8)], by = c("Nombre.FULL.2019"= "Nombre.variable")) %>%  select(- Nombre.FULL.2019, -Tipo.de.indicador)
+
+plan2020$filtro[plan2020$Nombre.variable == "J5_1_1"] = "F1_1_1 ==1"
+
+#### corregir regiones ####
+
+enusc2021$enc_regionFIX = NA
+
+enusc2021$enc_regionFIX[enusc2021$enc_region == 1] = "Tarapacá"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 2] = "Antofagasta"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 3] = "Atacama"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 4] = "Coquimbo"  
+enusc2021$enc_regionFIX[enusc2021$enc_region == 5] = "Valparaíso" 
+enusc2021$enc_regionFIX[enusc2021$enc_region == 6] = "O´Higgins"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 7] = "Maule"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 8] = "Biobío" 
+enusc2021$enc_regionFIX[enusc2021$enc_region == 9] = "La Araucanía"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 10] =  "Los Lagos"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 11] =  "Aysen"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 12] =  "Magallanes"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 13] =  "Metropolitana"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 14] =  "Los Ríos"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 15] =  "Arica y Parinacota"
+enusc2021$enc_regionFIX[enusc2021$enc_region == 16] =  "Ñuble"
+
+#trimws(stringr::str_remove_all(rownames(data.frame(attr(enusc2021$enc_region,"labels"))),"Región de|la"))
+enusc2021$enc_regionFIX = factor(enusc2021$enc_regionFIX,levels = c("Arica y Parinacota", "Tarapacá","Antofagasta","Atacama","Coquimbo",
+                                                                    "Valparaíso","Metropolitana","O´Higgins","Maule","Ñuble", "Biobío",
+                                                                    "La Araucanía","Los Ríos","Los Lagos","Aysen","Magallanes"))
+## filtramos por kish ####
+enusc2021 = enusc2021[enusc2021$Kish == 1,]
+
+
+for(i in 1:55){ variable = plan2020$Nombre.variable[i]  
+print(attr(enusc2021[[variable]],"labels")) 
+}
+
+enusc2021[[plan2020$Nombre.variable[5]]]
+
+#### pasamos a dummyes según especicaciones de variables
+for(i in 1:55){
+  
+  variable =  plan2020$Nombre.variable[i] 
+  
+  if(any(grepl("Siempre",names(attr(enusc2021[[variable]],"labels"))))){
+    enusc2021[[variable]] = as.numeric(dplyr::if_else(enusc2021[[variable]] == 4,1,0))
+  }
+  
+  if(any(grepl("Aumentó",names(attr(enusc2021[[variable]],"labels"))))){
+    enusc2021[[variable]] = as.numeric(dplyr::if_else(enusc2021[[variable]] == 1,1,0))
+  }
+  
+  if(any(grepl("Sí",names(attr(enusc2021[[variable]],"labels"))))){
+    enusc2021[[variable]] = as.numeric(dplyr::if_else(enusc2021[[variable]] == 1,1,0))
+  }
+  
+  if(any(grepl("Si",names(attr(enusc2021[[variable]],"labels"))))){
+    enusc2021[[variable]] = as.numeric(dplyr::if_else(enusc2021[[variable]] == 1,1,0))
+  }
+  
+  print(table(enusc2021[,plan2020$Nombre.variable[i]]))
+}
+
+## esta variable no está en el plan de tabulados
+enusc2021$F1_1_1 = if_else(enusc2021$F1_1_1 == 1,1,0)
+
+#### declaramos diseño complejo ####
+dcPERS = svydesign(ids =~Conglomerado, strata = ~VarStrat, weights = ~Fact_Pers ,data = enusc2021)
+dcHOG = svydesign(ids =~Conglomerado, strata = ~VarStrat, weights = ~Fact_Hog ,data = enusc2021)
+options(survey.lonely.psu = "certainty")
+
+tablas = list()
+tictoc::tic()
+for (i in c(1:55)) {
+#variable =  paste0(plan2020$Nombre.variable[i],"_dum")
+variable =  plan2020$Nombre.variable[i]
+  
+  subpopOBJ = NULL
+if(plan2020$filtro[i] != "no"){
+  subpopOBJ = plan2020$filtro[i]
+  
+  subpopOBJ = stringr::str_remove_all(subpopOBJ," ==1| == 1")
+  
+}
+
+  if(plan2020$Factor.de.expansión[i] == "Persona"){  
+  
+    tabulado1 = left_join(evaluate_prop(create_prop(var = variable,
+                                                    disenio = dcPERS, dominios = "enc_regionFIX", subpop = subpopOBJ,
+                                                    standard_eval = T), 
+                                        publicar = T)  %>% select(1,objetivo,calidad) %>% 
+                            mutate(calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2"))) %>% 
+                            rename("Región" = 1, "Total" = 2, "NotaTOT" = 3),  
+                          
+                          evaluate_prop(create_prop(var = variable, disenio = dcPERS, dominios = "enc_regionFIX+rph_sexo",subpop = subpopOBJ,
+                                                    standard_eval = T), 
+                                        publicar = T)  %>% select(1,2,objetivo,calidad) %>% mutate(rph_sexo = ifelse(rph_sexo == 1, "Hombres","Mujeres"),
+                                        calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2"))) %>% 
+                            pivot_wider( names_from = rph_sexo, values_from = c(objetivo, calidad)) %>% select(1,2,4,3,5) %>% 
+                            rename("Región" = 1,"Hombres" = 2,"Mujeres" = 4,"Nota1" = 3,"Nota2" = 5), by = "Región")
+    
+    
+    tabulado2 = cbind(evaluate_prop(create_prop(var = variable,
+                                                disenio = dcPERS, subpop = subpopOBJ,
+                                                standard_eval = T), 
+                                    publicar = T)  %>% select(1,objetivo,calidad) %>% rownames_to_column(var = "Región") %>% 
+                        mutate(calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2")),
+                               Región = "Total Nacional") %>% 
+                        rename("Región" = 1, "Total" = 2, "NotaTOT" = 3),  
+                      
+                      evaluate_prop(create_prop(var = variable, disenio = dcPERS, dominios = "rph_sexo",subpop = subpopOBJ,
+                                                standard_eval = T), 
+                                    publicar = T)  %>% select(1,2,objetivo,calidad) %>% 
+                        mutate(rph_sexo = ifelse(rph_sexo == 1, "Hombres","Mujeres"),
+                               calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2"))) %>% 
+                        pivot_wider(names_from = rph_sexo, values_from = c(objetivo, calidad)) %>% select(1,3,2,4) %>% 
+                        rename("Hombres" = 1,"Mujeres" = 3,"Nota1" = 2,"Nota2" = 4))
+    
+  tabulado = rbind(tabulado2, tabulado1)
+  
+  ROWS_tabulado = as.data.frame(matrix(" ",11,7)) %>% rename("Región" = 1,"Total" = 2, "NotaTOT" = 3,"Hombres" = 4,"Nota1" = 5, "Mujeres" = 6,"Nota2" = 7)
+  ROWS_tabulado = apply(ROWS_tabulado, 2, as.character)
+  
+  nombres = names(tabulado)
+  tabulado = apply(tabulado, 2, as.character)
+
+  tabulado = rbind(ROWS_tabulado,tabulado,ROWS_tabulado)
+
+  tabulado[11,] = nombres
+  
+  names(tabulado) = NULL
+  
+  tabulado[2,1] = plan2020$Cuadro[i]
+  tabulado[3,1] = plan2020$Nombre.variable[i]
+  
+  }else{
+  
+    if(variable %in% c("H2_1_1", "G2_1_1")){
+      dcPrueba = dcHOG[enusc2021$F1_1_1 == 1]
+    }else{
+      dcPrueba = dcHOG
+    }
+    
+    
+  tabulado1 = evaluate_prop(create_prop(var = variable,
+                                       disenio = dcPrueba, dominios = "enc_regionFIX",subpop = subpopOBJ, standard_eval = T), 
+                           publicar = T)  %>% select(1,objetivo,calidad) %>% 
+    mutate(calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2"))) %>% 
+    rename("Región" = 1,
+           "Total" = 2,
+           "Nota" = 3)
+  
+  
+  tabulado2 =   evaluate_prop(create_prop(var = variable,
+                            disenio = dcPrueba,subpop = subpopOBJ, standard_eval = T), 
+                publicar = T)  %>% select(objetivo,calidad) %>% rownames_to_column(var = "Región") %>% 
+    mutate(calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","1","2")),
+           Región = "Total Nacional") %>% 
+    rename("Región" = 1,
+           "Total" = 2,
+           "Nota" = 3)
+  
+  tabulado = rbind(tabulado2, tabulado1)
+  
+  ROWS_tabulado = as.data.frame(matrix(" ",11,3)) %>% rename("Región" = 1,"Total" = 2,"Nota" = 3)
+  ROWS_tabulado = apply(ROWS_tabulado, 2, as.character)
+  
+  nombres = names(tabulado)
+  tabulado = apply(tabulado, 2, as.character)
+  
+  tabulado = rbind(ROWS_tabulado,tabulado,ROWS_tabulado)
+  
+  tabulado[11,] = nombres
+  
+  names(tabulado) = NULL
+  
+  tabulado[2,1] = plan2020$Cuadro[i]
+  tabulado[3,1] = plan2020$Nombre.variable[i]
+  
+    }
+
+  ### valor de filadonde comienza a pegarse la tabla
+
+  tablas[[i]] = tabulado
+
+}
+tictoc::toc()
+
+
+#table(enusc2021$G2_1_1, exclude = F)
+#
+#table(enusc2021$G1_1_1[enusc2021$F1_1_1== 1], exclude = F)
+#
+#table(enusc2021$G2_1_1[enusc2021$G1_1_1 == 1 & enusc2021$F1_1_1== 1], exclude = F)
+##
+#dcPrueba = dcHOG[enusc2021$F1_1_1 == 1]
+#
+# create_prop(G2_1_1, disenio = dcPrueba, subpop = G1_1_1)
+# create_prop(G2_1_1, disenio = dcHOG, subpop = G1_1_1)
+#
+
+#dcPu = dcHOG[enusc2021$F1_1_1 == 1]
+#
+# evaluate_prop(create_prop(var = "G2_1_1", disenio = dcPu, dominios = "enc_regionFIX",subpop = "G1_1_1", standard_eval = T), publicar = T) # %>% select(1,objetivo,calidad) #%>% 
+#  
+# mutate(calidad = ifelse(calidad == "fiable"," ",ifelse(calidad == "poco fiable","a","b"))) %>% 
+#  rename("Región" = 1,
+#         "Total" = 2,
+#         "Nota" = 3)
+#
+ 
+ 
+### generamos tabla sin formato ####
+names(tablas) = plan2020$Nombre.variable[1:55]
+
+library(writexl)
+
+tablas = lapply(tablas, function(y)  apply(y, 2, function(x) stringr::str_replace_all(x,"," ,pattern ="\\.")))
+
+tablas = lapply(tablas, function(x) data.frame(x))
+
+write_xlsx(tablas, "tabulado2021_v4.xlsx",col_names = F)
+
+#### construimos archivo #####
+library(openxlsx)
+
+###### creamos función para dar borde a mas de una celda
+bordes <-function(wb, shet_name, color,rowFrom, rowTo, colFrom, colTo){
+  
+  sheet_nameO = shet_name
+  bottomR = rowTo
+  bottomC = c(colFrom:colTo)
+  topR = rowFrom
+  topC = c(colFrom:colTo)
+  leftR = c(rowFrom:rowTo)
+  leftC = colFrom
+  rightR = c(rowFrom:rowTo)
+  rightC = colTo
+  
+  
+  ## left borders
+  openxlsx::addStyle(
+    wb = wb,
+    sheet = sheet_nameO,
+    style = openxlsx::createStyle(
+      borderColour = color,
+      border = c("left"),
+      borderStyle = c("thick")
+    ),
+    rows = leftR,
+    cols = leftC,
+    stack = TRUE,
+    gridExpand = TRUE
+  )
+  
+  ##right borders
+  openxlsx::addStyle(
+    wb = wb,
+    sheet = sheet_nameO,
+    style = openxlsx::createStyle(
+      borderColour = color,
+      border = c("right"),
+      borderStyle = c("thick")
+    ),
+    rows = rightR,
+    cols = rightC,
+    stack = TRUE,
+    gridExpand = TRUE
+  )
+  
+  ## top borders
+  openxlsx::addStyle(
+    wb = wb,
+    sheet = sheet_nameO,
+    style = openxlsx::createStyle(
+      borderColour = color,
+      border = c("top"),
+      borderStyle = c("thick")
+    ),
+    rows = topR,
+    cols = topC,
+    stack = TRUE,
+    gridExpand = TRUE
+  ) 
+  
+  ##bottom borders
+  openxlsx::addStyle(
+    wb = wb,
+    sheet = sheet_nameO,
+    style = openxlsx::createStyle(
+      borderColour = color,
+      border = c("bottom"),
+      borderStyle = c("thick")
+    ),
+    rows = bottomR,
+    cols = bottomC,
+    stack = TRUE,
+    gridExpand = TRUE
+  ) 
+  
+  return(wb)
+}
+
+#################################################################################################################################
+####################################################### creamos workbook ########################################################
+#################################################################################################################################
+
+
+cat_reg = 16
+wb <- createWorkbook()
+sheets <- NA
+
+for (i in 1:55) {
+  
+  if(plan2020$Factor.de.expansión[i] == "Persona"){
+    cat_cruce = 2
+  }else{cat_cruce = 1}
+  
+
+  columna <- (length(cat_cruce)*2+1)
+  fila <- eval(parse(text =(cat_reg+10)))
+  
+  ##### extraemos los valores numericos de nuestro tabulados, para pegarlos aparte
+  ### condicional por si es un cruce simple o multiple ####
+  if(plan2020$Factor.de.expansión[i] != "Persona"){
+    tablas[[i]][11:(11+cat_reg),2] -> numTab; numTab
+    numTab <- as.numeric(numTab)
+    
+    ##### creamos pestaña con nombre de variable ####
+    pest <- as.character(plan2020$Nombre.variable[i])
+    
+    sheets[i] <- pest
+    
+    ##### agregamos la pestaña al workbook
+    addWorksheet(wb, pest, gridLines = T) 
+    
+    ## agregamos tabulado y sus títulos
+    writeData(wb,pest, tablas[[i]], colNames = F, keepNA = F)  
+    
+    ## creamos estilo para heather
+    headerStyle <- createStyle(textDecoration = "bold", fontColour = "#000000", halign = "center", wrapText = F)
+    addStyle(wb, pest, headerStyle, rows = 1:11, cols = 1:3, gridExpand = TRUE)
+    
+    ### creamos alineación izquierda
+    left_headerStyle <- createStyle( halign = "left", wrapText = F)
+    addStyle(wb, pest, left_headerStyle, rows = c(2:3,8), cols = c(1,2), gridExpand = TRUE, stack = T)
+    
+    ##### creamos alineación derecha
+    right_headerStyle <- createStyle( halign = "right", wrapText = F)
+    addStyle(wb, pest, right_headerStyle, rows = 9, cols = 3, gridExpand = TRUE, stack = T)
+    
+    #### bordes región
+    wb <- bordes(wb,shet_name = pest, "#000000", 8,10,1,1)
+    #### border total
+    wb <- bordes(wb,shet_name = pest, "#000000", 9,10,2,2)
+    #### border notas
+    wb <- bordes(wb,shet_name = pest, "#000000", 9,10,3,3)
+    #### bordes frecuencia relativa
+    wb <- bordes(wb,shet_name = pest, "#000000", 8,8,2,3)
+    ###### bordes sexo
+    #wb <- bordes(wb,shet_name = pest, "#000000", 9,9,3,4)
+    ##### bordes hombre
+    #wb <- bordes(wb,shet_name = pest, "#000000", 10,10,3,3)
+    ##### bordes mujer
+    #wb <- bordes(wb,shet_name = pest, "#000000", 10,10,4,4)
+    #### bordes  cat regiones
+    wb <- bordes(wb,shet_name = pest, "#000000", 11,fila,1,1)
+    #### bordes %
+    wb <- bordes(wb,shet_name = pest, "#000000", 11,fila,2,3)
+    
+    #### agregamos porcentajes
+    writeData(wb, pest, numTab, startCol = 2, startRow = 11, colNames = F)
+    
+    right_headerStyle <- createStyle(numFmt = "00.00%", halign = "right")
+    addStyle(wb, pest, right_headerStyle, rows = 11:27, cols = 2:2, gridExpand = TRUE, stack = T)
+    
+    u_headerStyle <- createStyle( halign = "left", wrapText = F)
+    addStyle(wb, pest, u_headerStyle, rows = 11, cols = 1, gridExpand = TRUE, stack = T)
+    
+    notas_style <- createStyle(numFmt = "0",halign = "center", fontSize = 10 )
+    addStyle(wb, pest, notas_style, rows = 10:27, cols = c(3) , gridExpand = TRUE, stack = T)
+    
+    pie_style <- createStyle(fontSize = 8 )
+    addStyle(wb, pest, pie_style, rows = 28:35, cols = 1 , gridExpand = TRUE, stack = T)
+    
+    setColWidths(wb, pest, cols=c(3), widths = 5) 
+    setColWidths(wb, pest, cols=1, widths = 21) 
+    setColWidths(wb, pest, cols=2:2, widths = 23) 
+    
+    writeFormula(wb, pest, startRow = 1, startCol = 1,
+                 x = makeHyperlinkString(sheet = "Índice", row = 1, col = 1
+                                         , text = "Índice"))
+    
+  }else{
+    
+    tablas[[i]][11:(11+cat_reg),2:(cat_cruce*2+1)] -> numTab; numTab
+    ##### convertimos estos valores en Numericos para evitar problemas de formato
+    for(k in seq(cat_cruce*2)){
+      numTab[k] <- as.numeric(unlist(numTab[k]))
+    }; numTab
+    
+    ##### falta trabajar mas en el estilo de exportación de tabulados con ma de 3 variable de cruce
+    ##### creamos pestaña con nombre de variable ####
+    pest <- as.character(plan2020$Nombre.variable[i])
+    #pest <-
+    sheets[i] <- pest
+    
+    ##### agregamos la pestaña al workbook
+    addWorksheet(wb, pest, gridLines = T) 
+    
+    ## agregamos tabulado y sus títulos
+    writeData(wb,pest, tablas[[i]], colNames = F, keepNA = F)  
+    
+    ## creamos estilo para heather
+    headerStyle <- createStyle(textDecoration = "bold", fontColour = "#000000", halign = "center", wrapText = F)
+    addStyle(wb, pest, headerStyle, rows = 1:11, cols = 1:columna, gridExpand = TRUE)
+    
+    ### creamos alineación izquierda
+    left_headerStyle <- createStyle( halign = "left", wrapText = F)
+    addStyle(wb, pest, left_headerStyle, rows = c(2:3,8), cols = c(1,3), gridExpand = TRUE, stack = T)
+    
+    ##### creamos alineación derecha
+    right_headerStyle <- createStyle( halign = "left", wrapText = F)
+    addStyle(wb, pest, right_headerStyle, rows = 9, cols = 3, gridExpand = TRUE, stack = T)
+    
+    #### bordes región
+    wb <- bordes(wb,shet_name = pest, "#000000", 8,10,1,1)
+    #### border total
+    wb <- bordes(wb,shet_name = pest, "#000000", 8,10,2,2)
+    #### bordes frecuencia relativa
+    wb <- bordes(wb,shet_name = pest, "#000000", 8,8,3,eval(parse(text = columna)))
+    
+    ###### bordes sexo
+    wb <- bordes(wb,shet_name = pest, "#000000", 9,9,3,eval(parse(text = columna)))
+    ##### bordes hombre
+    #  wb <- bordes(wb,shet_name = pest, "#000000", 10,10,3,3)
+    ##### bordes mujer
+    wb <- bordes(wb,shet_name = pest, "#000000", 10,10,3,eval(parse(text = columna)))
+    
+    #### bordes  cat regiones
+    wb <- bordes(wb,shet_name = pest, "#000000", 11,fila,1,1)
+    #### bordes %
+    wb <- bordes(wb,shet_name = pest, "#000000", 11,fila,2,eval(parse(text = columna)))
+    
+    #### agregamos porcentajes
+    writeData(wb, pest, numTab, startCol = 2, startRow = 11, colNames = F)
+    
+    right_headerStyle <- createStyle(numFmt = "00.00%", halign = "right")
+    addStyle(wb, pest, right_headerStyle, rows = 11:27, cols = 2:eval(parse(text = columna)), gridExpand = TRUE, stack = T)
+    
+    u_headerStyle <- createStyle( halign = "left", wrapText = F)
+    addStyle(wb, pest, u_headerStyle, rows = 11, cols = 1, gridExpand = TRUE, stack = T)
+    
+    imp= c(3,5,7,9,11,13,15)
+    
+    colum = imp[imp <= max(columna)]
+    colum <- paste(colum, sep = ",")
+    
+    notas_style <- createStyle(numFmt = "0",halign = "center", fontSize = 10 )
+    addStyle(wb, pest, notas_style, rows = 10:27, cols = c(3,5,7) , gridExpand = TRUE, stack = T)
+    
+    pie_style <- createStyle(fontSize = 8 )
+    addStyle(wb, pest, pie_style, rows = 28:35, cols = 1 , gridExpand = TRUE, stack = T)
+    
+    setColWidths(wb, pest, cols=1, widths = 21) 
+    setColWidths(wb, pest, cols=2:eval(parse(text = columna)), widths = 15) 
+    setColWidths(wb, pest, cols=c(3,5,7), widths = 5) 
+    
+    writeFormula(wb, pest, startRow = 1, startCol = 1,
+                 x = makeHyperlinkString(sheet = "Índice", row = 1, col = 1
+                                         , text = "Índice"))
+    
+  }
+}{
+
+## agregamos indice con hiperlink ####
+
+addWorksheet(wb, "Índice", gridLines = T, ) 
+
+## agregamos tabulado y sus títulos
+
+plan2020[,c("Cuadro",  "Desagregación")] -> ind
+
+#gsub("\\.", " ",names(ind)) -> names(ind)
+ind <- ind %>% 
+  mutate('División Político Administrativa' = '16 regiones',
+         'N°' = seq(1:nrow(ind)),
+         "Indicador (hipervínculo)" = "") %>% 
+  select('N°', Cuadro, Desagregación, "División Político Administrativa", "Indicador (hipervínculo)")
+
+tod <- paste(1:nrow(ind))
+ult <- paste(nrow(ind)+1)
+
+openxlsx::worksheetOrder(wb) <- c(ult,tod)
+
+writeData(wb, "Índice", ind, startCol = 1, startRow = 2)  
+
+row = 3
+for (p in seq(sheets)) {
+  writeFormula(wb, "Índice", startRow = row, startCol = 5,
+               x = makeHyperlinkString(sheet = sheets[p], row = 2, col = 2
+                                       , text = sheets[p]))
+  row = row + 1
+}
+
+
+nr <-(length(sheets) + 2)
+
+writeData(wb, "Índice", "Índice", startCol = 2, startRow = 1)  
+
+#### estilo tabla indice
+indStyle <- createStyle(halign = "center", wrapText = F, borderColour = "#000000", borderStyle = "thin",
+                        border = c("top", "bottom","left","right"))
+
+addStyle(wb, "Índice", indStyle, rows = 1:nr, cols = 1:5, gridExpand = TRUE)
+
+#### aliniación
+indAligStyle <- createStyle(halign = "left", wrapText = F, borderColour = "#000000", borderStyle = "thin",
+                            border = c("top", "bottom","left","right"))
+
+addStyle(wb, "Índice", indAligStyle, rows = 3:nr,  cols = 2, gridExpand = TRUE, stack = T)
+
+#### bold header indice
+boldIndgStyle <- createStyle(textDecoration = "bold", halign = "center")
+
+addStyle(wb, "Índice", boldIndgStyle, rows = 1:2,  cols = 1:5, gridExpand = TRUE, stack = T)
+
+#### blue hiperlink
+blueStyle <- createStyle(fontColour = "blue")
+
+addStyle(wb, "Índice", blueStyle, rows = 3:nr,  cols = 5, gridExpand = TRUE, stack = T)
+
+setColWidths(wb,  "Índice",cols=2:5, widths = "auto") 
+setColWidths(wb,  "Índice",cols=1, widths = 21) 
+
+###### GUARDAMOS ####
+
+# función para abrir tabulados en excel
+
+#openXL(wb)
+
+hoy = format(Sys.time(), "%Y%m%d%H%M%S")
+
+### guardamos tabulados en formato excel
+openxlsx::saveWorkbook(wb, paste0("tabulado_2021_",hoy,".xlsx"))
+
+### fijamos tiempo de termino
+}
+
+
